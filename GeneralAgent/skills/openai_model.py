@@ -203,7 +203,7 @@ def _llm_inference_with_stream(client, messages, model, **args):
         raise ValueError('LLM(Large Language Model) error, Please check your key, base_url, or network')
 
 
-def _llm_inference(client, messages, model, **args):
+def _llm_inference_without_stream(client, messages, model, **args):
     try:
         args = _update_llm_args(model, args)
         response = client.chat.completions.create(
