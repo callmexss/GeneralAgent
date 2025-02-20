@@ -170,21 +170,40 @@ def _llm_inference_with_stream(client, messages, model, **args):
             stream=True,
             **args
         )
+
+        in_thinking = False
         for chunk in response:
-            if len(chunk.choices) > 0:
-                # Compatible with service using Azure API proxies, such as One-API
-                if chunk.choices[0].delta is None:
-                    continue
-                token = chunk.choices[0].delta.content
-                if token is None:
-                    continue
-                yield token
+            if not chunk.choices:
+                continue
+                
+            delta = chunk.choices[0].delta
+            if not delta:
+                continue
+
+            # Handle reasoning content with thinking tags
+            if hasattr(delta, 'reasoning_content') and delta.reasoning_content:
+                if not in_thinking:
+                    yield "<thinking>\n"
+                    in_thinking = True
+                yield delta.reasoning_content
+            
+            # Handle regular content
+            if hasattr(delta, 'content') and delta.content:
+                if in_thinking:
+                    yield "\n</thinking>\n"
+                    in_thinking = False
+                yield delta.content
+
+        # Close thinking tag if still open
+        if in_thinking:
+            yield "\n</thinking>\n"
+
     except Exception as e:
         logging.exception(e)
-        raise ValueError('LLM(Large Languate Model) error, Please check your key or base_url, or network')
+        raise ValueError('LLM(Large Language Model) error, Please check your key, base_url, or network')
 
 
-def _llm_inference_without_stream(client, messages, model, **args):
+def _llm_inference(client, messages, model, **args):
     try:
         args = _update_llm_args(model, args)
         response = client.chat.completions.create(
@@ -193,12 +212,25 @@ def _llm_inference_without_stream(client, messages, model, **args):
             stream=False,
             **args
         )
-        result = response.choices[0].message.content
+        
+        result = ""
+        # Handle reasoning content
+        if hasattr(response.choices[0].message, 'reasoning_content') and response.choices[0].message.reasoning_content:
+            result += "<thinking>\n"
+            result += response.choices[0].message.reasoning_content
+            result += "\n</thinking>\n"
+        
+        # Handle regular content
+        if hasattr(response.choices[0].message, 'content') and response.choices[0].message.content:
+            result += response.choices[0].message.content
+            
         return result
+        
     except Exception as e:
         logging.exception(e)
-        raise ValueError('LLM(Large Languate Model) error, Please check your key or base_url, or network')
-    
+        raise ValueError('LLM(Large Language Model) error, Please check your key, base_url, or network')
+
+
 def speech_to_text(audio_file_path):
     """Convert speech in audio to text, return text"""
     from GeneralAgent import skills
