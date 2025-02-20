@@ -284,7 +284,7 @@ class Agent:
             messages += [{"role": "system", "content": the_prompt}]
             response = skills.llm_inference(
                 messages,
-                model="smart",
+                model=self.model,
                 stream=False,
                 api_key=self.api_key,
                 base_url=self.base_url,
